@@ -26,15 +26,15 @@ exclude_dates = pd.to_datetime([
 ])
 
 print("Read File")
-TransferRaw = pd.read_excel(r"SI-SO\Aug\Transfer.xlsx",dtype={"IMEI":str})
+TransferRaw = pd.read_excel(r"SI-SO\July\Transfer.xlsx",dtype={"IMEI":str})
 Transfer = TransferRaw.copy()
-Order = pd.read_excel(r"SI-SO\Aug\Order.xlsx",dtype={"IMEI":str})
-Client = pd.read_excel(r"SI-SO\Aug\Client Data - Final July.xlsx")
-Info = pd.read_excel(r"SI-SO\Aug\IMEI Info.xlsx",dtype={"IMEI/SN":str})
-Retail = pd.read_excel(r"SI-SO\Aug\Retail.xlsx",dtype={"IMEI":str})
-PSM =pd.read_excel(r"SI-SO\Aug\PSM Final July.xlsx",sheet_name="Data Store")
-PSMDirect = pd.read_excel(r"SI-SO\Aug\PSM Final July.xlsx",sheet_name="โค้ดรับตรง")
-PSMPC = pd.read_excel(r"SI-SO\Aug\PSM Final July.xlsx",sheet_name="Data PC")
+Order = pd.read_excel(r"SI-SO\July\Order.xlsx",dtype={"IMEI":str})
+Client = pd.read_excel(r"SI-SO\July\Client Data - Final July.xlsx")
+Info = pd.read_excel(r"SI-SO\July\IMEI Info.xlsx",dtype={"IMEI/SN":str})
+Retail = pd.read_excel(r"SI-SO\July\Retail.xlsx",dtype={"IMEI":str})
+PSM =pd.read_excel(r"SI-SO\July\PSM Final July.xlsx",sheet_name="Data Store")
+PSMDirect = pd.read_excel(r"SI-SO\July\PSM Final July.xlsx",sheet_name="โค้ดรับตรง")
+PSMPC = pd.read_excel(r"SI-SO\July\PSM Final July.xlsx",sheet_name="Data PC")
 
 print("Read Completed")
 
@@ -493,18 +493,12 @@ so_cond = so_cond.merge(
     PSMDirect[
         [
             "Store Code",
-            "Client ID สั่งตรง"
+            "Client ID สั่งตรง",
+            "Client Name"
         ]
     ],on="Store Code",
     how="left"
 )
-so_cond.rename(
-    columns={
-        "Client ID สั่งตรง": "Client_Direct ID",
-        "Client Name": "Client_Direct Name"
-    },inplace=True
-)
-
 
 so_cond["SPU_Spec_Full"] = (
     so_cond["SPU Name"]
@@ -513,7 +507,7 @@ so_cond["SPU_Spec_Full"] = (
 
 so_cond["SPU_Spec_abbr"] = (
     so_cond["SPU_Spec_Full"]
-    .str.extract(r"realme\s+([A-Za-z0-9])\s+(\d+)GB\s+(\d+)GB")
+    .str.extract(r"realme\s+(.+?)\s+(\d+)GB\s+(\d+)GB",expand=True)
     .apply(lambda x:f"{x[0]}_{x[2]}+{x[1]}",axis=1)
 )
 so_cond["spec_tier"] = None
@@ -524,7 +518,39 @@ so_cond["ST Client Channel"] = None
 so_cond["Store id by client"] = None
 so_cond["Si_wh"] = None
 so_cond["Store No Pc 15 Days"] = None
-
+so_condforCash = so_cond[
+    [
+        "IMEI",
+        "Order Type",
+        "Product Type",
+        "SKU ID",
+        "Series Name",
+        "spec_tier",
+        "SPU Name",
+        "SKU Spec",
+        "SPU_Spec_Full",
+        "SPU_Spec_abbr",
+        "Activate Time",
+        "Sale time",
+        "E_date",
+        "Client Code",
+        "Client Code for Map",
+        "Client Name (GS-System)",
+        "Client Type",
+        "Client Subtype",
+        "Client Channel",
+        "Channel for Map",
+        "Status",
+        "Main Zone",
+        "Main RSD",
+        "ST Client",
+        "ST Client Name",
+        "ST Client Channel",
+        "Store Code",
+        "Store id by client",
+        "Sale status"
+    ]
+]
 so_cond = so_cond[
     [
         "IMEI",
@@ -571,8 +597,8 @@ so_cond = so_cond[
         "Big Type",
         "Store Type",
         "Subclass2",
-        "Client_Direct ID",
-        "Client_Direct Name",
+        "Client ID สั่งตรง",
+        "Client Name",
         "PC Total",
         "Store No Pc 15 Days",
         "Zone",
@@ -580,39 +606,7 @@ so_cond = so_cond[
         "so_rsm"
     ]
 ]
-so_condforCash = so_cond[
-    [
-        "IMEI",
-        "Order Type",
-        "Product Type",
-        "SKU ID",
-        "Series Name",
-        "spec_tier",
-        "SPU Name",
-        "SKU Spec",
-        "SPU_Spec_Full",
-        "SPU_Spec_abbr",
-        "Activate Time",
-        "Sale time",
-        "E_date",
-        "Client Code",
-        "Client Code for Map",
-        "Client Name (GS-System)",
-        "Client Type",
-        "Client Subtype",
-        "Client Channel",
-        "Channel for Map",
-        "Status",
-        "Main Zone",
-        "Main RSD",
-        "ST Client",
-        "ST Client Name",
-        "ST Client Channel",
-        "Store Code",
-        "Store id by client",
-        "Sale status"
-    ]
-]
+
 ##################################################################################
 
 print("so_cond Completed")
