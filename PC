@@ -1,0 +1,181 @@
+import pandas as pd
+import numpy as np
+
+import warnings
+
+from pandas.core.dtypes import astype
+
+warnings.filterwarnings(
+    "ignore",
+    message="Workbook contains no default style"
+)
+
+Month = "Oct"
+Year = "2026"
+PC_Raw = pd.read_excel(
+    rf"SI-SO\\{Month}\\PSM.xlsx",
+    sheet_name="Data PC"
+)
+
+Store_Raw = pd.read_excel(
+    rf"SI-SO\\{Month}\\PSM.xlsx",
+    sheet_name="Data Store"
+)
+
+PC_Raw["Join Date HR"] = pd.to_datetime(
+    PC_Raw["Join Date HR"]
+)
+
+PC_Active = PC_Raw.loc[
+    (PC_Raw["Situation"] == "Active") &
+    (PC_Raw["Remark"] != "产假-ลาคลอด")
+].copy()
+
+PC_Active = (PC_Active
+             .sort_values(by=["Join Date HR"])
+             .drop_duplicates(subset="Store ID", keep="first")
+             )
+
+
+Month_End = (
+    pd.to_datetime(f"{Year}-{Month}-01")
+    + pd.offsets.MonthEnd(0)
+)
+
+PC_Active["Day"] = (
+    Month_End - PC_Active["Join Date HR"]
+).dt.days.clip(lower=0)
+
+PC_Active["Day_PC"] = (
+    PC_Active["Day"] > 15
+).astype(int)
+
+PC_Active.rename(
+    columns={"Store ID": "Store Code"}, inplace=True)
+
+
+PC_Active = PC_Active[
+    [
+        "Store Code",
+        "Join Date HR",
+        "Situation",
+        "Remark",
+        "Day",
+        "Day_PC"
+    ]
+]
+##############################################################################################
+
+
+PC_Raw["Join Date HR"] = pd.to_datetime(
+    PC_Raw["Join Date HR"]
+)
+PC_Resign_Join = PC_Raw.loc[
+    (PC_Raw["Situation"] == "Resign")
+].copy()
+PC_Resign_Join = (PC_Resign_Join
+                  .sort_values(by=["Join Date HR"])
+                  .drop_duplicates(subset="Store ID", keep="last"))
+PC_Resign_Join.rename(columns={"Store ID" : "Store Code"}, inplace=True)
+
+PC_Resign_Join = PC_Resign_Join[
+    [
+        "Store Code",
+        "Join Date HR",
+        "Situation"
+    ]
+]
+##############################################################################################
+
+
+PC_Raw["Resign Date"] = pd.to_datetime(
+    PC_Raw["Resign Date"]
+)
+
+PC_Resigned = PC_Raw.loc[
+    (PC_Raw["Situation"] == "Resign")
+].copy()
+
+PC_Resigned = (PC_Resigned
+                  .sort_values(by=["Resign Date"])
+                  .drop_duplicates(subset="Store ID", keep="last"))
+
+PC_Resigned.rename(columns={"Store ID" : "Store Code"}, inplace=True)
+
+PC_Resigned = PC_Resigned[
+    [
+        "Store Code",
+        "Resign Date",
+        "Situation"
+    ]
+]
+
+##############################################################################################
+Store_Raw.rename(columns={"Store ID" : "Store Code"}, inplace=True)
+Store_Raw = Store_Raw.merge(
+    PC_Active[
+        [
+            "Store Code",
+            "Day_PC",
+        ]
+    ],on="Store Code",
+    how="left"
+)
+Store_Raw = Store_Raw.merge(
+    PC_Resign_Join[
+        [
+            "Store Code",
+            "Join Date HR"
+        ]
+    ],on="Store Code",
+    how="left"
+)
+
+Store_Raw = Store_Raw.merge(
+    PC_Resigned[
+        [
+            "Store Code",
+            "Resign Date"
+        ]
+    ],on="Store Code",
+    how="left"
+)
+
+Month_Start = pd.to_datetime(f"{Year}-{Month}-01")
+Month_half = Month_Start + pd.Timedelta(days=14)
+
+Store_Raw["Resign_After_15"] = (
+    Store_Raw["Resign Date"] >= Month_half
+).astype(int)
+
+Store_Raw["Day_Resign"] = np.where(
+    Store_Raw["Resign_After_15"] == 1,(
+
+        Store_Raw["Resign Date"] - Store_Raw["Join Date HR"]
+    ).dt.days.clip(lower=0),
+    0
+)
+
+Store_Raw["N_Day_Resign"] = (Store_Raw["Day_Resign"] > 15).astype(int)
+
+Store_Raw["Day_PC"] = Store_Raw["Day_PC"].fillna(0)
+Store_Raw["N_Day_PC"] = Store_Raw["N_Day_Resign"].fillna(0)
+
+Store_Raw["Store No Pc 15 Days"] = np.where(Store_Raw["Day_PC"] ==0, Store_Raw["N_Day_Resign"], Store_Raw["Day_PC"])
+
+
+with pd.ExcelWriter(
+    rf"SI-SO\\{Month}\\PC.xlsx",
+    engine="openpyxl"
+) as writer:
+
+    PC_Active.to_excel(writer,sheet_name="PC_Active",index=False)
+    PC_Resign_Join.to_excel(writer, sheet_name="PC_Resign_Join", index=False)
+    PC_Resigned.to_excel(writer, sheet_name="PC_Resigned", index=False)
+    Store_Raw.to_excel(writer, sheet_name="Store", index=False)
+
+    for ws in writer.book.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if hasattr(cell.value, "strftime"):
+                    cell.number_format = "yyyy-mm-dd"
